@@ -5,7 +5,9 @@ description = "Flight booking service backend"
 requires-python = ">=3.13"
 dependencies = [
     "fastapi>=0.141.1",
+    "psycopg[binary]>=3.3.4",
     "uvicorn>=0.52.4",
+    "yoyo-migrations>=9.0.0",
 ]
 
 [dependency-groups]

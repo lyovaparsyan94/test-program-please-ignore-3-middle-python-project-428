@@ -1,7 +1,9 @@
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.responses import FileResponse, JSONResponse
+
+from app.db import get_db
 
 PUBLIC_DIR = Path(__file__).resolve().parent.parent / "public"
 
@@ -10,9 +12,11 @@ def create_app() -> FastAPI:
     app = FastAPI()
 
     @app.get("/api/cities")
-    def get_cities():
-        # Данные появятся на следующих шагах.
-        return []
+    def get_cities(conn=Depends(get_db)):
+        rows = conn.execute(
+            "SELECT code, name, country FROM cities ORDER BY position"
+        ).fetchall()
+        return rows
 
     # Неизвестный путь внутри /api/ — это JSON-404, а не index.html.
     @app.api_route("/api/{path:path}", methods=["GET", "POST", "DELETE", "PUT", "PATCH"])
