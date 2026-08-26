@@ -33,12 +33,18 @@ jobs:
 
       - run: make install
       - run: make build
-      - run: npx playwright install --with-deps chromium
       - run: make test-api
 
-      - name: Запустить приложение в фоне
+      # Браузерные тесты Хекслета лежат в __tests__ и подкладываются проверкой
+      # hexlet-check, а не хранятся в репозитории. Запускаем их только если каталог
+      # реально есть — иначе шаг ничего не находит и падает не по делу.
+      - name: Browser tests (if present)
         run: |
-          make start &
-          until curl -sf "$APP_URL/api/cities" >/dev/null; do sleep 1; done
-
-      - run: make test
+          if [ -d "__tests__" ]; then
+            npx playwright install --with-deps chromium
+            make start &
+            until curl -sf "$APP_URL/api/cities" >/dev/null; do sleep 1; done
+            make test
+          else
+            echo "Каталог __tests__ отсутствует — браузерные тесты пропущены."
+          fi
