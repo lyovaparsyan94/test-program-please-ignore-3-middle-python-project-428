@@ -202,3 +202,104 @@ def test_create_booking_generates_unique_codes():
         for _ in range(5)
     }
     assert len(codes) == 5
+
+
+def _make_booking(last_name="Петров"):
+    flight = _a_flight()
+    booking = client.post(
+        "/api/bookings", json=_payload(flight["id"], [_passenger(last_name)])
+    ).json()
+    return booking["code"]
+
+
+def test_get_booking_by_code_and_last_name():
+    code = _make_booking("Петров")
+    response = client.get(f"/api/bookings/{code}", params={"lastName": "Петров"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["code"] == code
+    assert body["status"] == "confirmed"
+
+
+def test_get_booking_last_name_case_and_spaces_insensitive():
+    code = _make_booking("Петров")
+    response = client.get(f"/api/bookings/{code}", params={"lastName": "  пЕтРоВ  "})
+
+    assert response.status_code == 200
+    assert response.json()["code"] == code
+
+
+def test_get_booking_code_is_case_insensitive():
+    code = _make_booking("Петров")
+    response = client.get(
+        f"/api/bookings/{code.lower()}", params={"lastName": "Петров"}
+    )
+
+    assert response.status_code == 200
+    assert response.json()["code"] == code
+
+
+def test_get_booking_wrong_last_name_returns_404():
+    code = _make_booking("Петров")
+    response = client.get(f"/api/bookings/{code}", params={"lastName": "Иванов"})
+
+    assert response.status_code == 404
+    assert response.json()["code"] == "not_found"
+
+
+def test_get_booking_unknown_code_returns_404():
+    response = client.get("/api/bookings/ZZZZZZ", params={"lastName": "Петров"})
+
+    assert response.status_code == 404
+    assert response.json()["code"] == "not_found"
+
+
+def test_get_booking_missing_last_name_returns_404():
+    code = _make_booking("Петров")
+    response = client.get(f"/api/bookings/{code}")
+
+    assert response.status_code == 404
+    assert response.json()["code"] == "not_found"
+
+
+def test_cancel_booking_returns_cancelled():
+    code = _make_booking("Петров")
+    response = client.post(
+        f"/api/bookings/{code}/cancel", json={"lastName": "Петров"}
+    )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "cancelled"
+    # статус сохранился в базе
+    assert client.get(
+        f"/api/bookings/{code}", params={"lastName": "Петров"}
+    ).json()["status"] == "cancelled"
+
+
+def test_cancel_booking_is_idempotent():
+    code = _make_booking("Петров")
+    first = client.post(f"/api/bookings/{code}/cancel", json={"lastName": "Петров"})
+    second = client.post(f"/api/bookings/{code}/cancel", json={"lastName": "Петров"})
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert second.json()["status"] == "cancelled"
+
+
+def test_cancel_booking_missing_last_name_returns_404():
+    code = _make_booking("Петров")
+    response = client.post(f"/api/bookings/{code}/cancel", json={})
+
+    assert response.status_code == 404
+    assert response.json()["code"] == "not_found"
+
+
+def test_cancel_booking_wrong_last_name_returns_404():
+    code = _make_booking("Петров")
+    response = client.post(
+        f"/api/bookings/{code}/cancel", json={"lastName": "Иванов"}
+    )
+
+    assert response.status_code == 404
+    assert response.json()["code"] == "not_found"

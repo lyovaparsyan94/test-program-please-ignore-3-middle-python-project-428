@@ -131,4 +131,86 @@ def create_booking(
     }
 
 
-__all__ = ["create_booking", "generate_code", "get_flight"]
+_BOOKING_COLUMNS = """
+    id, code, status, flight_id, contact_email, contact_phone,
+    total_price_amount, currency, created_at
+"""
+
+
+def _serialize_booking(conn: psycopg.Connection, booking: dict) -> dict:
+    flight = get_flight(conn, booking["flight_id"])
+    passengers = conn.execute(
+        """
+        SELECT first_name, last_name, date_of_birth, document_number
+        FROM passengers WHERE booking_id = %s ORDER BY id
+        """,
+        (booking["id"],),
+    ).fetchall()
+    return {
+        "code": booking["code"],
+        "status": booking["status"],
+        "flight": flight,
+        "passengers": [{
+            "firstName": p["first_name"],
+            "lastName": p["last_name"],
+            "dateOfBirth": p["date_of_birth"].isoformat(),
+            "documentNumber": p["document_number"],
+        } for p in passengers],
+        "contact": {
+            "email": booking["contact_email"],
+            "phone": booking["contact_phone"],
+        },
+        "totalPrice": {
+            "amount": booking["total_price_amount"],
+            "currency": booking["currency"],
+        },
+        "createdAt": _iso_z(booking["created_at"]),
+    }
+
+
+def _find_booking(conn: psycopg.Connection, code: str, last_name: str | None) -> dict | None:
+    """Ищем по коду, затем сверяем фамилию с любым пассажиром.
+    Любая неудача (нет кода, не та фамилия, нет фамилии) — один и тот же None,
+    чтобы перебором нельзя было отличить существующий код от несуществующего."""
+    if not last_name or not last_name.strip():
+        return None
+
+    # Код приходит из адреса — нормализуем к тому виду, в котором храним.
+    booking = conn.execute(
+        f"SELECT {_BOOKING_COLUMNS} FROM bookings WHERE code = %s",
+        (code.strip().upper(),),
+    ).fetchone()
+    if booking is None:
+        return None
+
+    # Сравнение фамилии — в БД: без регистра, с индексом по lower(last_name).
+    match = conn.execute(
+        "SELECT 1 FROM passengers WHERE booking_id = %s AND lower(last_name) = lower(%s) LIMIT 1",
+        (booking["id"], last_name.strip()),
+    ).fetchone()
+    return booking if match is not None else None
+
+
+def get_booking(conn: psycopg.Connection, code: str, last_name: str | None) -> dict | None:
+    booking = _find_booking(conn, code, last_name)
+    return _serialize_booking(conn, booking) if booking else None
+
+
+def cancel_booking(conn: psycopg.Connection, code: str, last_name: str | None) -> dict | None:
+    booking = _find_booking(conn, code, last_name)
+    if booking is None:
+        return None
+    # Повторная отмена допустима — просто снова вернём cancelled.
+    if booking["status"] != "cancelled":
+        conn.execute(
+            "UPDATE bookings SET status = 'cancelled' WHERE id = %s",
+            (booking["id"],),
+        )
+        booking["status"] = "cancelled"
+    return _serialize_booking(conn, booking)
+
+
+__all__ = [
+    "create_booking", "generate_code", "get_flight",
+    "validate_payload", "get_booking", "cancel_booking",
+]

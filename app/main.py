@@ -5,7 +5,12 @@ from fastapi import Body, Depends, FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
 
-from app.bookings import create_booking, validate_payload
+from app.bookings import (
+    cancel_booking,
+    create_booking,
+    get_booking,
+    validate_payload,
+)
 from app.db import get_db
 from app.flights import get_flight, search_flights
 
@@ -85,6 +90,23 @@ def create_app() -> FastAPI:
 
         booking = create_booking(conn, flight, data["contact"], data["passengers"])
         return JSONResponse(booking, status_code=201)
+
+    @app.get("/api/bookings/{code}")
+    def get_booking_by_code(code: str, lastName: str | None = None, conn=Depends(get_db)):
+        booking = get_booking(conn, code, lastName)
+        if booking is None:
+            return not_found("Бронь не найдена")
+        return booking
+
+    @app.post("/api/bookings/{code}/cancel")
+    def cancel_booking_by_code(
+        code: str, body: dict | None = Body(default=None), conn=Depends(get_db)
+    ):
+        last_name = body.get("lastName") if isinstance(body, dict) else None
+        booking = cancel_booking(conn, code, last_name)
+        if booking is None:
+            return not_found("Бронь не найдена")
+        return booking
 
     # Неизвестный путь внутри /api/ — это JSON-404, а не index.html.
     @app.api_route("/api/{path:path}", methods=["GET", "POST", "DELETE", "PUT", "PATCH"])
