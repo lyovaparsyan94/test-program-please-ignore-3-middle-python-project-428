@@ -1,0 +1,13 @@
+{
+  "name": "@hexlet/code",
+  "version": "1.0.0",
+  "description": "Flight booking service backend",
+  "private": true,
+  "scripts": {
+    "test": "echo \"No tests yet\" && exit 0"
+  },
+  "license": "ISC",
+  "dependencies": {
+    "@hexlet/python-flight-booking-frontend": "^1.0.0"
+  }
+}
