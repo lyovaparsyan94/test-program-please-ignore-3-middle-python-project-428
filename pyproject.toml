@@ -1,5 +1,5 @@
 [project]
-name = "flights"
+name = "hexlet-code"
 version = "0.1.0"
 description = "Flight booking service backend"
 requires-python = ">=3.13"
