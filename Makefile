@@ -14,4 +14,7 @@ start:
 test:
 	npm test
 
-.PHONY: install build start test
+contract:
+	npx tsp compile contract
+
+.PHONY: install build start test contract
