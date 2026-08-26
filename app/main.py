@@ -1,10 +1,11 @@
 from datetime import date as date_cls
 from pathlib import Path
 
-from fastapi import Depends, FastAPI, Request
+from fastapi import Body, Depends, FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
 
+from app.bookings import create_booking, validate_payload
 from app.db import get_db
 from app.flights import get_flight, search_flights
 
@@ -71,6 +72,19 @@ def create_app() -> FastAPI:
         if flight is None:
             return not_found("Рейс не найден")
         return flight
+
+    @app.post("/api/bookings")
+    def post_booking(body: dict = Body(...), conn=Depends(get_db)):
+        data, error = validate_payload(body)
+        if error is not None:
+            return validation_error(error)
+
+        flight = get_flight(conn, data["flightId"])
+        if flight is None:
+            return validation_error("Рейс не найден")
+
+        booking = create_booking(conn, flight, data["contact"], data["passengers"])
+        return JSONResponse(booking, status_code=201)
 
     # Неизвестный путь внутри /api/ — это JSON-404, а не index.html.
     @app.api_route("/api/{path:path}", methods=["GET", "POST", "DELETE", "PUT", "PATCH"])

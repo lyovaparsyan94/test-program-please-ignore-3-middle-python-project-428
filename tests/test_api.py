@@ -115,3 +115,90 @@ def test_flight_by_unknown_id_returns_404():
 
     assert response.status_code == 404
     assert response.json()["code"] == "not_found"
+
+
+def _a_flight():
+    flights = client.get(
+        "/api/flights",
+        params={"origin": "MOW", "destination": "LED", "date": _date_ahead(3)},
+    ).json()
+    return flights[0]
+
+
+def _passenger(last_name="Петров"):
+    return {
+        "firstName": "Иван",
+        "lastName": last_name,
+        "dateOfBirth": "1990-05-20",
+        "documentNumber": "1",
+    }
+
+
+def _payload(flight_id, passengers):
+    return {
+        "flightId": flight_id,
+        "contact": {"email": "ivan@example.com", "phone": "+79991234567"},
+        "passengers": passengers,
+    }
+
+
+def test_create_booking_one_passenger():
+    flight = _a_flight()
+    response = client.post("/api/bookings", json=_payload(flight["id"], [_passenger()]))
+
+    assert response.status_code == 201
+    booking = response.json()
+    assert len(booking["code"]) == 6
+    assert all(ch in "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789" for ch in booking["code"])
+    assert booking["status"] == "confirmed"
+    assert booking["flight"]["id"] == flight["id"]
+    assert len(booking["passengers"]) == 1
+    assert booking["totalPrice"]["amount"] == flight["price"]["amount"]
+    assert booking["totalPrice"]["currency"] == "RUB"
+    assert booking["createdAt"].endswith("Z")
+
+
+def test_create_booking_two_passengers_doubles_total():
+    flight = _a_flight()
+    payload = _payload(flight["id"], [_passenger("Петров"), _passenger("Сидоров")])
+    response = client.post("/api/bookings", json=payload)
+
+    assert response.status_code == 201
+    booking = response.json()
+    assert len(booking["passengers"]) == 2
+    assert booking["totalPrice"]["amount"] == flight["price"]["amount"] * 2
+
+
+def test_create_booking_empty_passengers_returns_400():
+    flight = _a_flight()
+    response = client.post("/api/bookings", json=_payload(flight["id"], []))
+
+    assert response.status_code == 400
+    assert response.json()["code"] == "validation_error"
+
+
+def test_create_booking_missing_field_returns_400():
+    flight = _a_flight()
+    passenger = _passenger()
+    del passenger["lastName"]
+    response = client.post("/api/bookings", json=_payload(flight["id"], [passenger]))
+
+    assert response.status_code == 400
+    assert response.json()["code"] == "validation_error"
+
+
+def test_create_booking_unknown_flight_returns_400():
+    response = client.post("/api/bookings", json=_payload("NOPE", [_passenger()]))
+
+    assert response.status_code == 400
+    assert response.json()["code"] == "validation_error"
+
+
+def test_create_booking_generates_unique_codes():
+    flight = _a_flight()
+    codes = {
+        client.post("/api/bookings", json=_payload(flight["id"], [_passenger()]))
+        .json()["code"]
+        for _ in range(5)
+    }
+    assert len(codes) == 5
