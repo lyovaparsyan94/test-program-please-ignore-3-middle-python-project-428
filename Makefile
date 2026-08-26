@@ -12,9 +12,12 @@ start:
 	uv run uvicorn --factory app.main:create_app --host 0.0.0.0 --port $${PORT:-8080}
 
 test:
-	npm test
+	npx playwright test
+
+test-api:
+	uv run pytest
 
 contract:
 	npx tsp compile contract
 
-.PHONY: install build start test contract
+.PHONY: install build start test test-api contract

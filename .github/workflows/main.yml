@@ -1,0 +1,44 @@
+name: main
+
+on: [push, pull_request]
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    services:
+      db:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: appdb
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+        ports: ['5432:5432']
+    env:
+      DATABASE_URL: postgres://postgres:password@localhost:5432/appdb
+      APP_URL: http://localhost:8080
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - run: make install
+      - run: make build
+      - run: npx playwright install --with-deps chromium
+      - run: make test-api
+
+      - name: Запустить приложение в фоне
+        run: |
+          make start &
+          until curl -sf "$APP_URL/api/cities" >/dev/null; do sleep 1; done
+
+      - run: make test
