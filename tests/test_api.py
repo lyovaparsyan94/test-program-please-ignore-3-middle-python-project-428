@@ -11,6 +11,13 @@ def _date_ahead(days: int) -> str:
     return (datetime.now(timezone.utc).date() + timedelta(days=days)).isoformat()
 
 
+def test_health_returns_ok():
+    response = client.get("/api/health")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "ok"
+
+
 def test_cities_returns_200_and_json_array():
     response = client.get("/api/cities")
 

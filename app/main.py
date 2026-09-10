@@ -38,6 +38,12 @@ def create_app() -> FastAPI:
     def on_validation_error(request: Request, exc: RequestValidationError):
         return validation_error("Некорректные параметры запроса")
 
+    # Healthcheck для docker-compose проверки: контейнер app считается готовым
+    # только когда эндпоинт отвечает 200.
+    @app.get("/api/health")
+    def health():
+        return {"status": "ok"}
+
     @app.get("/api/cities")
     def get_cities(conn=Depends(get_db)):
         return list_cities(conn)
