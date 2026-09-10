@@ -1,5 +1,10 @@
 FRONTEND_DIST = node_modules/@hexlet/python-flight-booking-frontend/dist
 
+# Локальный дефолт для разработки. ?= не перетирает значение из окружения,
+# поэтому в CI и на Render (где DATABASE_URL задан) остаётся их строка.
+DATABASE_URL ?= postgresql://flights:flights@localhost:5432/flights
+export DATABASE_URL
+
 install:
 	uv sync
 	npm ci
