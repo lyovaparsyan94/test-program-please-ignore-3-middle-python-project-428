@@ -13,7 +13,9 @@
 
 ## Демо
 
-Развёрнутое приложение: <!-- TODO: ссылка на Render, например https://flight-booking-xxxx.onrender.com -->
+Развёрнутое приложение: https://test-program-please-ignore-3-middle.onrender.com
+
+> На бесплатном плане Render сервис засыпает при простое — первый запрос может идти около минуты.
 
 ## Стек
 
