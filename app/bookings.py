@@ -24,7 +24,8 @@ def _non_empty_str(value: object) -> bool:
 
 
 def validate_payload(body: object) -> tuple[dict | None, str | None]:
-    # Только присутствие и непустота полей, не форматы: documentNumber "1" проходит.
+    # Только присутствие и непустота полей, не форматы:
+    # documentNumber "1" обязан проходить.
     if not isinstance(body, dict):
         return None, "Тело запроса должно быть объектом"
 
@@ -32,8 +33,11 @@ def validate_payload(body: object) -> tuple[dict | None, str | None]:
         return None, "flightId обязателен"
 
     contact = body.get("contact")
-    if not isinstance(contact, dict) or not _non_empty_str(contact.get("email")) \
-            or not _non_empty_str(contact.get("phone")):
+    if (
+        not isinstance(contact, dict)
+        or not _non_empty_str(contact.get("email"))
+        or not _non_empty_str(contact.get("phone"))
+    ):
         return None, "contact.email и contact.phone обязательны"
 
     passengers = body.get("passengers")
@@ -109,8 +113,11 @@ def create_booking(
                     )
                     VALUES (%s, %s, %s, %s, %s)
                     """,
-                    [(row["id"], p["firstName"], p["lastName"],
-                      p["dateOfBirth"], p["documentNumber"]) for p in passengers],
+                    [
+                        (row["id"], p["firstName"], p["lastName"],
+                         p["dateOfBirth"], p["documentNumber"])
+                        for p in passengers
+                    ],
                 )
             break
         except psycopg.errors.UniqueViolation:
@@ -166,9 +173,11 @@ def _serialize_booking(conn: psycopg.Connection, booking: dict) -> dict:
     }
 
 
-def _find_booking(conn: psycopg.Connection, code: str, last_name: str | None) -> dict | None:
-    # Любая неудача (нет кода / не та фамилия / нет фамилии) — один и тот же None,
-    # чтобы перебором нельзя было отличить существующий код от несуществующего.
+def _find_booking(
+    conn: psycopg.Connection, code: str, last_name: str | None
+) -> dict | None:
+    # Любая неудача (нет кода / не та фамилия / нет фамилии) —
+    # один и тот же None: перебором не отличить существующий код.
     # _non_empty_str, а не .strip(): для {"lastName": 1} .strip() дал бы 500.
     if not _non_empty_str(last_name):
         return None
@@ -183,18 +192,23 @@ def _find_booking(conn: psycopg.Connection, code: str, last_name: str | None) ->
 
     # Фамилию сверяем в БД: без регистра, по индексу lower(last_name).
     match = conn.execute(
-        "SELECT 1 FROM passengers WHERE booking_id = %s AND lower(last_name) = lower(%s) LIMIT 1",
+        "SELECT 1 FROM passengers "
+        "WHERE booking_id = %s AND lower(last_name) = lower(%s) LIMIT 1",
         (booking["id"], last_name.strip()),
     ).fetchone()
     return booking if match is not None else None
 
 
-def get_booking(conn: psycopg.Connection, code: str, last_name: str | None) -> dict | None:
+def get_booking(
+    conn: psycopg.Connection, code: str, last_name: str | None
+) -> dict | None:
     booking = _find_booking(conn, code, last_name)
     return _serialize_booking(conn, booking) if booking else None
 
 
-def cancel_booking(conn: psycopg.Connection, code: str, last_name: str | None) -> dict | None:
+def cancel_booking(
+    conn: psycopg.Connection, code: str, last_name: str | None
+) -> dict | None:
     booking = _find_booking(conn, code, last_name)
     if booking is None:
         return None

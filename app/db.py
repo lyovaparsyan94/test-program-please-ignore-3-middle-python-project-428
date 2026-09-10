@@ -12,7 +12,8 @@ _pool: ConnectionPool | None = None
 
 def _configure(conn: psycopg.Connection) -> None:
     # Пояс сессии — UTC (сервер БД локально и на Render разный).
-    # commit обязателен: иначе SET держит соединение в транзакции и пул его отбросит.
+    # commit обязателен: иначе SET держит соединение в транзакции,
+    # и пул его отбросит.
     conn.execute("SET TIME ZONE 'UTC'")
     conn.commit()
 

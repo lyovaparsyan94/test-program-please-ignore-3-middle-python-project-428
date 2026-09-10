@@ -63,7 +63,8 @@ def search_flights(
     departure_date: date,
     passengers: int,
 ) -> list[dict]:
-    # День сравниваем в UTC — как отдаём departureAt, иначе утренние рейсы уедут в соседний день.
+    # День сравниваем в UTC — как отдаём departureAt, иначе утренние
+    # рейсы уедут в соседний день.
     rows = conn.execute(
         _SELECT
         + """

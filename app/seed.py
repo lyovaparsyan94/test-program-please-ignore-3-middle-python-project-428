@@ -41,9 +41,11 @@ def _build_flights(today):
                 continue
             for day in range(DAYS_AHEAD):
                 flight_date = today + timedelta(days=day)
-                # Ключ — абсолютная дата (как и атрибуты ниже), чтобы число рейсов
-                # на дату не менялось между запусками.
-                count = 2 + _seed(origin, destination, flight_date.isoformat(), "count") % 2
+                # Ключ — абсолютная дата, чтобы число рейсов на дату
+                # не менялось между запусками.
+                count = 2 + _seed(
+                    origin, destination, flight_date.isoformat(), "count"
+                ) % 2
                 for idx in range(count):
                     h = _seed(origin, destination, flight_date.isoformat(), idx)
                     airline = airline_codes[h % len(airline_codes)]
@@ -58,7 +60,8 @@ def _build_flights(today):
                         dep_hour, dep_minute, tzinfo=timezone.utc,
                     )
                     arrival_at = departure_at + timedelta(minutes=duration)
-                    flight_id = f"fl-{origin}-{destination}-{flight_date:%Y%m%d}-{idx}"
+                    day_str = f"{flight_date:%Y%m%d}"
+                    flight_id = f"fl-{origin}-{destination}-{day_str}-{idx}"
                     rows.append((
                         flight_id, f"{airline}{number}", airline,
                         origin, destination, departure_at, arrival_at,
@@ -83,7 +86,10 @@ def seed() -> None:
                     country = EXCLUDED.country,
                     position = EXCLUDED.position
                 """,
-                [(c, n, country, i) for i, (c, n, country) in enumerate(CITIES)],
+                [
+                    (c, n, country, i)
+                    for i, (c, n, country) in enumerate(CITIES)
+                ],
             )
             cur.executemany(
                 """
