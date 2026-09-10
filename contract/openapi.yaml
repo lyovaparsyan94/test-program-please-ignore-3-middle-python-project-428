@@ -164,6 +164,17 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/NotFoundError'
+  /api/health:
+    get:
+      operationId: health
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
 components:
   schemas:
     Airline:
@@ -288,6 +299,13 @@ components:
         seatsAvailable:
           type: integer
           format: int32
+    Health:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
     Money:
       type: object
       required:

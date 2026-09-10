@@ -59,6 +59,10 @@ model Booking {
   createdAt: utcDateTime;
 }
 
+model Health {
+  status: string;
+}
+
 // ---------- Тела запросов ----------
 
 model BookingCreate {
@@ -98,6 +102,10 @@ model BookingCreated {
 }
 
 // ---------- Операции ----------
+
+@route("/api/health")
+@get
+op health(): Health;
 
 @route("/api/cities")
 @get
