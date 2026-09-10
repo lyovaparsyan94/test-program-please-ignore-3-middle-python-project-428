@@ -172,7 +172,9 @@ def _find_booking(conn: psycopg.Connection, code: str, last_name: str | None) ->
     """Ищем по коду, затем сверяем фамилию с любым пассажиром.
     Любая неудача (нет кода, не та фамилия, нет фамилии) — один и тот же None,
     чтобы перебором нельзя было отличить существующий код от несуществующего."""
-    if not last_name or not last_name.strip():
+    # _non_empty_str, а не last_name.strip(): тело отмены приходит без схемы,
+    # и для {"lastName": 1} .strip() у числа упал бы 500 вместо 404.
+    if not _non_empty_str(last_name):
         return None
 
     # Код приходит из адреса — нормализуем к тому виду, в котором храним.

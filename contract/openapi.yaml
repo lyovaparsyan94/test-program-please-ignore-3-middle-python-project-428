@@ -38,7 +38,7 @@ paths:
             type: string
         - name: lastName
           in: query
-          required: true
+          required: false
           schema:
             type: string
           explode: false
@@ -225,8 +225,6 @@ components:
           minItems: 1
     CancelRequest:
       type: object
-      required:
-        - lastName
       properties:
         lastName:
           type: string

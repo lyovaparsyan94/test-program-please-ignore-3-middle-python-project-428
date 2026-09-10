@@ -70,7 +70,9 @@ model BookingCreate {
 }
 
 model CancelRequest {
-  lastName: string;
+  // Необязателен по контракту: отсутствующий lastName даёт 404 (как неверный код),
+  // а не отказ на входе — иначе перебором отличили бы существующий код.
+  lastName?: string;
 }
 
 // ---------- Ошибки ----------
@@ -120,7 +122,7 @@ op createBooking(@body body: BookingCreate): BookingCreated | ValidationError;
 
 @route("/api/bookings/{code}")
 @get
-op getBooking(@path code: string, @query lastName: string): Booking | NotFoundError;
+op getBooking(@path code: string, @query lastName?: string): Booking | NotFoundError;
 
 @route("/api/bookings/{code}/cancel")
 @post

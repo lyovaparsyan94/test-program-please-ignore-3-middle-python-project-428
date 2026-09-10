@@ -11,6 +11,7 @@ from app.bookings import (
     get_booking,
     validate_payload,
 )
+from app.cities import list_cities
 from app.db import get_db
 from app.flights import get_flight, search_flights
 
@@ -40,10 +41,7 @@ def create_app() -> FastAPI:
 
     @app.get("/api/cities")
     def get_cities(conn=Depends(get_db)):
-        rows = conn.execute(
-            "SELECT code, name, country FROM cities ORDER BY position"
-        ).fetchall()
-        return rows
+        return list_cities(conn)
 
     @app.get("/api/flights")
     def get_flights(
@@ -109,7 +107,12 @@ def create_app() -> FastAPI:
         return booking
 
     # Неизвестный путь внутри /api/ — это JSON-404, а не index.html.
-    @app.api_route("/api/{path:path}", methods=["GET", "POST", "DELETE", "PUT", "PATCH"])
+    # HEAD обязателен: без него HEAD-запрос к /api/... проваливается в SPA-fallback
+    # ниже и получает 200 с index.html вместо JSON-404 (в т.ч. на существующих ручках).
+    @app.api_route(
+        "/api/{path:path}",
+        methods=["GET", "HEAD", "POST", "DELETE", "PUT", "PATCH"],
+    )
     def api_not_found(path: str):
         return not_found("Ресурс не найден")
 
