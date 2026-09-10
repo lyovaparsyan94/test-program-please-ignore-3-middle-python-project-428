@@ -33,8 +33,7 @@ def not_found(message: str) -> JSONResponse:
 def create_app() -> FastAPI:
     app = FastAPI()
 
-    # FastAPI по умолчанию отдаёт 422 {"detail": [...]}, а контракт требует
-    # 400 {"code": "validation_error", ...}. Переопределяем один раз.
+    # FastAPI по умолчанию отдаёт 422 {"detail": [...]}, контракт требует 400.
     @app.exception_handler(RequestValidationError)
     def on_validation_error(request: Request, exc: RequestValidationError):
         return validation_error("Некорректные параметры запроса")
@@ -106,9 +105,8 @@ def create_app() -> FastAPI:
             return not_found("Бронь не найдена")
         return booking
 
-    # Неизвестный путь внутри /api/ — это JSON-404, а не index.html.
-    # HEAD обязателен: без него HEAD-запрос к /api/... проваливается в SPA-fallback
-    # ниже и получает 200 с index.html вместо JSON-404 (в т.ч. на существующих ручках).
+    # Любой путь под /api/ — JSON-404, а не index.html. HEAD обязателен:
+    # без него HEAD /api/... провалился бы в SPA-fallback и отдал бы страницу.
     @app.api_route(
         "/api/{path:path}",
         methods=["GET", "HEAD", "POST", "DELETE", "PUT", "PATCH"],
@@ -116,13 +114,11 @@ def create_app() -> FastAPI:
     def api_not_found(path: str):
         return not_found("Ресурс не найден")
 
-    # SPA-fallback — обязательно последним маршрутом, после всех /api/...
-    # HEAD нужен: статику проверяют `curl -sI`, а браузер шлёт HEAD за ассетами.
+    # SPA-fallback — последним, после всех /api/. HEAD нужен для статики (curl -sI).
     @app.api_route("/{path:path}", methods=["GET", "HEAD"])
     def spa(path: str):
         file = (PUBLIC_DIR / path).resolve()
-        # is_relative_to обязателен: путь приходит из запроса,
-        # и `..` в нём увёл бы за пределы public.
+        # is_relative_to: `..` в пути из запроса иначе увёл бы за пределы public.
         if path and file.is_relative_to(PUBLIC_DIR) and file.is_file():
             return FileResponse(file)
 

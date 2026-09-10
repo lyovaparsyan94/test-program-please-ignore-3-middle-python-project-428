@@ -2,8 +2,7 @@ from datetime import date, datetime, timezone
 
 import psycopg
 
-# Города в ответе — объекты целиком, поэтому джойним справочники
-# один раз в запросе, а не добираем на каждый рейс отдельно.
+# Города и авиакомпания — целиком, поэтому джойним справочники одним запросом.
 _SELECT = """
     SELECT
         f.id,
@@ -30,8 +29,7 @@ _SELECT = """
 
 
 def _iso_z(value: datetime) -> str:
-    """ISO 8601 в UTC с Z на конце: фронтенд разбирает именно Z,
-    а Python по умолчанию сериализует timestamptz как +00:00."""
+    # С Z на конце: фронтенд разбирает Z, а Python по умолчанию даёт +00:00.
     return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
@@ -65,8 +63,7 @@ def search_flights(
     departure_date: date,
     passengers: int,
 ) -> list[dict]:
-    # День вылета сравниваем в UTC — том же поясе, в котором отдаём departureAt,
-    # иначе ранние утренние рейсы уедут в соседний день.
+    # День сравниваем в UTC — как отдаём departureAt, иначе утренние рейсы уедут в соседний день.
     rows = conn.execute(
         _SELECT
         + """

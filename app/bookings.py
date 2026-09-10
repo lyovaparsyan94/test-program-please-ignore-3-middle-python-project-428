@@ -24,8 +24,7 @@ def _non_empty_str(value: object) -> bool:
 
 
 def validate_payload(body: object) -> tuple[dict | None, str | None]:
-    """Проверяем присутствие и непустоту обязательных полей (не форматы).
-    documentNumber "1" обязан проходить. Возвращает (данные, ошибка)."""
+    # Только присутствие и непустота полей, не форматы: documentNumber "1" проходит.
     if not isinstance(body, dict):
         return None, "Тело запроса должно быть объектом"
 
@@ -82,8 +81,7 @@ def create_booking(
     contact: dict,
     passengers: list[dict],
 ) -> dict:
-    """Создаёт бронь и её пассажиров одной транзакцией.
-    Стоимость считает сервер: цена рейса × число пассажиров."""
+    # Бронь и пассажиры — одной транзакцией; сумму считает сервер.
     total = flight["price"]["amount"] * len(passengers)
 
     # Уникальность кода держит ограничение в БД; при коллизии — ретрай.
@@ -169,15 +167,13 @@ def _serialize_booking(conn: psycopg.Connection, booking: dict) -> dict:
 
 
 def _find_booking(conn: psycopg.Connection, code: str, last_name: str | None) -> dict | None:
-    """Ищем по коду, затем сверяем фамилию с любым пассажиром.
-    Любая неудача (нет кода, не та фамилия, нет фамилии) — один и тот же None,
-    чтобы перебором нельзя было отличить существующий код от несуществующего."""
-    # _non_empty_str, а не last_name.strip(): тело отмены приходит без схемы,
-    # и для {"lastName": 1} .strip() у числа упал бы 500 вместо 404.
+    # Любая неудача (нет кода / не та фамилия / нет фамилии) — один и тот же None,
+    # чтобы перебором нельзя было отличить существующий код от несуществующего.
+    # _non_empty_str, а не .strip(): для {"lastName": 1} .strip() дал бы 500.
     if not _non_empty_str(last_name):
         return None
 
-    # Код приходит из адреса — нормализуем к тому виду, в котором храним.
+    # Код из адреса нормализуем к виду, в котором храним.
     booking = conn.execute(
         f"SELECT {_BOOKING_COLUMNS} FROM bookings WHERE code = %s",
         (code.strip().upper(),),
@@ -185,7 +181,7 @@ def _find_booking(conn: psycopg.Connection, code: str, last_name: str | None) ->
     if booking is None:
         return None
 
-    # Сравнение фамилии — в БД: без регистра, с индексом по lower(last_name).
+    # Фамилию сверяем в БД: без регистра, по индексу lower(last_name).
     match = conn.execute(
         "SELECT 1 FROM passengers WHERE booking_id = %s AND lower(last_name) = lower(%s) LIMIT 1",
         (booking["id"], last_name.strip()),
@@ -210,9 +206,3 @@ def cancel_booking(conn: psycopg.Connection, code: str, last_name: str | None) -
         )
         booking["status"] = "cancelled"
     return _serialize_booking(conn, booking)
-
-
-__all__ = [
-    "create_booking", "generate_code", "get_flight",
-    "validate_payload", "get_booking", "cancel_booking",
-]

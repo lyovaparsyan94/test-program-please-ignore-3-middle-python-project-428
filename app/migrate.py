@@ -8,8 +8,7 @@ MIGRATIONS_DIR = Path(__file__).resolve().parent.parent / "migrations"
 
 
 def _yoyo_url(url: str) -> str:
-    """yoyo выбирает драйвер по схеме URL. Нам нужен psycopg 3 —
-    его backend зарегистрирован на схему postgresql+psycopg."""
+    # yoyo выбирает драйвер по схеме; psycopg 3 сидит на postgresql+psycopg.
     for prefix in ("postgresql://", "postgres://"):
         if url.startswith(prefix):
             return "postgresql+psycopg://" + url[len(prefix):]

@@ -26,8 +26,7 @@ CURRENCY = "RUB"
 
 
 def _seed(*parts: object) -> int:
-    """Детерминированное псевдослучайное число из ключа: одинаковый
-    ключ — одинаковый результат, отладка предсказуема."""
+    # Детерминированное число из ключа: одинаковый ключ — одинаковый результат.
     key = "|".join(str(p) for p in parts)
     return int(hashlib.sha256(key.encode()).hexdigest(), 16)
 
@@ -42,9 +41,8 @@ def _build_flights(today):
                 continue
             for day in range(DAYS_AHEAD):
                 flight_date = today + timedelta(days=day)
-                # Ключ — абсолютная дата, как и у остальных атрибутов ниже:
-                # иначе одна и та же дата на разных запусках дала бы разное
-                # число рейсов, и предсказуемость из докстринга не держалась бы.
+                # Ключ — абсолютная дата (как и атрибуты ниже), чтобы число рейсов
+                # на дату не менялось между запусками.
                 count = 2 + _seed(origin, destination, flight_date.isoformat(), "count") % 2
                 for idx in range(count):
                     h = _seed(origin, destination, flight_date.isoformat(), idx)
@@ -95,9 +93,7 @@ def seed() -> None:
                 """,
                 AIRLINES,
             )
-            # Рейсы — DO NOTHING: детерминированный id уже задаёт все атрибуты,
-            # так что повторная заливка не плодит дубли и не трогает существующие
-            # строки (id — первичный ключ, конфликт просто пропускается).
+            # Рейсы — DO NOTHING: id детерминирован, повтор не плодит дубли.
             cur.executemany(
                 """
                 INSERT INTO flights (

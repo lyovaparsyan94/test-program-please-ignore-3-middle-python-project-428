@@ -11,23 +11,13 @@ _pool: ConnectionPool | None = None
 
 
 def _configure(conn: psycopg.Connection) -> None:
-    """Выполняется один раз на создание соединения в пуле.
-
-    Пояс выставляем явно: по умолчанию он берётся с сервера базы, а он на
-    локальной машине и на Render разный. В пуле — один SET на соединение,
-    а не round-trip на каждый запрос.
-
-    commit обязателен: без него SET оставляет соединение в открытой
-    транзакции (INTRANS), и пул такое соединение отбрасывает. Настройка
-    пояса — на уровне сессии, коммит её не сбрасывает.
-    """
+    # Пояс сессии — UTC (сервер БД локально и на Render разный).
+    # commit обязателен: иначе SET держит соединение в транзакции и пул его отбросит.
     conn.execute("SET TIME ZONE 'UTC'")
     conn.commit()
 
 
 def get_pool() -> ConnectionPool:
-    """Ленивый пул на процесс. Верхняя граница max_size защищает бесплатную
-    базу от исчерпания коннектов при всплеске запросов."""
     global _pool
     if _pool is None:
         _pool = ConnectionPool(
@@ -42,11 +32,7 @@ def get_pool() -> ConnectionPool:
 
 
 def get_db() -> Iterator[psycopg.Connection]:
-    """FastAPI-зависимость: соединение из пула на время запроса.
-
-    Явные getconn/putconn с finally: соединение обязательно возвращается
-    в пул после запроса, включая путь с исключением.
-    """
+    # Соединение из пула на запрос; finally гарантирует возврат.
     pool = get_pool()
     conn = pool.getconn()
     try:
@@ -61,8 +47,7 @@ def get_db() -> Iterator[psycopg.Connection]:
 
 @contextmanager
 def get_connection() -> Iterator[psycopg.Connection]:
-    """Отдельное соединение для разовых задач (миграции, заливка данных),
-    которые не проходят через пул запросов."""
+    # Разовое соединение для миграций и заливки, мимо пула запросов.
     conn = psycopg.connect(get_database_url(), row_factory=dict_row)
     try:
         conn.execute("SET TIME ZONE 'UTC'")
