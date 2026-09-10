@@ -1,3 +1,4 @@
+import string
 from datetime import datetime, timedelta, timezone
 
 from fastapi.testclient import TestClient
@@ -6,9 +7,47 @@ from app.main import create_app
 
 client = TestClient(create_app())
 
+CODE_CHARS = set(string.ascii_uppercase + string.digits)
+
 
 def _date_ahead(days: int) -> str:
-    return (datetime.now(timezone.utc).date() + timedelta(days=days)).isoformat()
+    day = datetime.now(timezone.utc).date() + timedelta(days=days)
+    return day.isoformat()
+
+
+def _passenger(last_name="Петров"):
+    return {
+        "firstName": "Иван",
+        "lastName": last_name,
+        "dateOfBirth": "1990-05-20",
+        "documentNumber": "1",
+    }
+
+
+def _payload(flight_id, passengers):
+    return {
+        "flightId": flight_id,
+        "contact": {"email": "ivan@example.com", "phone": "+79991234567"},
+        "passengers": passengers,
+    }
+
+
+def _a_flight():
+    flights = client.get(
+        "/api/flights",
+        params={"origin": "MOW", "destination": "LED", "date": _date_ahead(3)},
+    ).json()
+    return flights[0]
+
+
+def _make_booking(*last_names):
+    names = last_names or ("Петров",)
+    flight = _a_flight()
+    passengers = [_passenger(name) for name in names]
+    booking = client.post(
+        "/api/bookings", json=_payload(flight["id"], passengers)
+    ).json()
+    return booking["code"]
 
 
 def test_health_returns_ok():
@@ -42,10 +81,9 @@ def test_unknown_api_path_returns_json_404():
 
 
 def test_flights_search_returns_matching_flights():
-    date = _date_ahead(2)
     response = client.get(
         "/api/flights",
-        params={"origin": "MOW", "destination": "LED", "date": date},
+        params={"origin": "MOW", "destination": "LED", "date": _date_ahead(2)},
     )
 
     assert response.status_code == 200
@@ -60,6 +98,18 @@ def test_flights_search_returns_matching_flights():
     assert set(flight["airline"]) == {"code", "name"}
 
 
+def test_flights_search_today_returns_flights():
+    # Главная ищет рейсы на сегодня — сдвинувшаяся заливка сломала бы её,
+    # но прочие тесты берут даты в будущем и этого не заметили бы.
+    response = client.get(
+        "/api/flights",
+        params={"origin": "MOW", "destination": "LED", "date": _date_ahead(0)},
+    )
+
+    assert response.status_code == 200
+    assert len(response.json()) > 0
+
+
 def test_flights_search_same_city_returns_empty_list():
     response = client.get(
         "/api/flights",
@@ -71,16 +121,23 @@ def test_flights_search_same_city_returns_empty_list():
 
 
 def test_flights_search_respects_passengers_filter():
-    date = _date_ahead(2)
-    params = {"origin": "MOW", "destination": "LED", "date": date}
+    params = {"origin": "MOW", "destination": "LED", "date": _date_ahead(2)}
     all_flights = client.get("/api/flights", params=params).json()
+    assert len(all_flights) > 0
 
-    huge = client.get("/api/flights", params={**params, "passengers": "999"}).json()
-    assert huge == []
+    # Порог выше свободных мест любого рейса — не находится ничего.
+    max_seats = max(f["seatsAvailable"] for f in all_flights)
+    over = client.get(
+        "/api/flights", params={**params, "passengers": str(max_seats + 1)}
+    ).json()
+    assert over == []
 
-    assert all(f["seatsAvailable"] >= 2
-               for f in client.get("/api/flights", params={**params, "passengers": "2"}).json())
-    assert len(all_flights) >= len(huge)
+    # Порог 2 не превышает мест (их минимум 10) — набор тот же.
+    two = client.get(
+        "/api/flights", params={**params, "passengers": "2"}
+    ).json()
+    assert len(two) == len(all_flights)
+    assert all(f["seatsAvailable"] >= 2 for f in two)
 
 
 def test_flights_search_missing_date_returns_400():
@@ -95,8 +152,12 @@ def test_flights_search_missing_date_returns_400():
 def test_flights_search_invalid_passengers_returns_400():
     response = client.get(
         "/api/flights",
-        params={"origin": "MOW", "destination": "LED",
-                "date": _date_ahead(2), "passengers": "0"},
+        params={
+            "origin": "MOW",
+            "destination": "LED",
+            "date": _date_ahead(2),
+            "passengers": "0",
+        },
     )
 
     assert response.status_code == 400
@@ -104,10 +165,9 @@ def test_flights_search_invalid_passengers_returns_400():
 
 
 def test_flight_by_id_returns_flight():
-    date = _date_ahead(2)
     flights = client.get(
         "/api/flights",
-        params={"origin": "MOW", "destination": "LED", "date": date},
+        params={"origin": "MOW", "destination": "LED", "date": _date_ahead(2)},
     ).json()
     flight_id = flights[0]["id"]
 
@@ -124,39 +184,16 @@ def test_flight_by_unknown_id_returns_404():
     assert response.json()["code"] == "not_found"
 
 
-def _a_flight():
-    flights = client.get(
-        "/api/flights",
-        params={"origin": "MOW", "destination": "LED", "date": _date_ahead(3)},
-    ).json()
-    return flights[0]
-
-
-def _passenger(last_name="Петров"):
-    return {
-        "firstName": "Иван",
-        "lastName": last_name,
-        "dateOfBirth": "1990-05-20",
-        "documentNumber": "1",
-    }
-
-
-def _payload(flight_id, passengers):
-    return {
-        "flightId": flight_id,
-        "contact": {"email": "ivan@example.com", "phone": "+79991234567"},
-        "passengers": passengers,
-    }
-
-
 def test_create_booking_one_passenger():
     flight = _a_flight()
-    response = client.post("/api/bookings", json=_payload(flight["id"], [_passenger()]))
+    response = client.post(
+        "/api/bookings", json=_payload(flight["id"], [_passenger()])
+    )
 
     assert response.status_code == 201
     booking = response.json()
     assert len(booking["code"]) == 6
-    assert all(ch in "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789" for ch in booking["code"])
+    assert set(booking["code"]) <= CODE_CHARS
     assert booking["status"] == "confirmed"
     assert booking["flight"]["id"] == flight["id"]
     assert len(booking["passengers"]) == 1
@@ -167,8 +204,10 @@ def test_create_booking_one_passenger():
 
 def test_create_booking_two_passengers_doubles_total():
     flight = _a_flight()
-    payload = _payload(flight["id"], [_passenger("Петров"), _passenger("Сидоров")])
-    response = client.post("/api/bookings", json=payload)
+    passengers = [_passenger("Петров"), _passenger("Сидоров")]
+    response = client.post(
+        "/api/bookings", json=_payload(flight["id"], passengers)
+    )
 
     assert response.status_code == 201
     booking = response.json()
@@ -188,14 +227,18 @@ def test_create_booking_missing_field_returns_400():
     flight = _a_flight()
     passenger = _passenger()
     del passenger["lastName"]
-    response = client.post("/api/bookings", json=_payload(flight["id"], [passenger]))
+    response = client.post(
+        "/api/bookings", json=_payload(flight["id"], [passenger])
+    )
 
     assert response.status_code == 400
     assert response.json()["code"] == "validation_error"
 
 
 def test_create_booking_unknown_flight_returns_400():
-    response = client.post("/api/bookings", json=_payload("NOPE", [_passenger()]))
+    response = client.post(
+        "/api/bookings", json=_payload("NOPE", [_passenger()])
+    )
 
     assert response.status_code == 400
     assert response.json()["code"] == "validation_error"
@@ -204,24 +247,19 @@ def test_create_booking_unknown_flight_returns_400():
 def test_create_booking_generates_unique_codes():
     flight = _a_flight()
     codes = {
-        client.post("/api/bookings", json=_payload(flight["id"], [_passenger()]))
-        .json()["code"]
+        client.post(
+            "/api/bookings", json=_payload(flight["id"], [_passenger()])
+        ).json()["code"]
         for _ in range(5)
     }
     assert len(codes) == 5
 
 
-def _make_booking(last_name="Петров"):
-    flight = _a_flight()
-    booking = client.post(
-        "/api/bookings", json=_payload(flight["id"], [_passenger(last_name)])
-    ).json()
-    return booking["code"]
-
-
 def test_get_booking_by_code_and_last_name():
     code = _make_booking("Петров")
-    response = client.get(f"/api/bookings/{code}", params={"lastName": "Петров"})
+    response = client.get(
+        f"/api/bookings/{code}", params={"lastName": "Петров"}
+    )
 
     assert response.status_code == 200
     body = response.json()
@@ -229,9 +267,22 @@ def test_get_booking_by_code_and_last_name():
     assert body["status"] == "confirmed"
 
 
+def test_get_booking_found_by_any_passenger_last_name():
+    # Бронь находится по фамилии любого пассажира, не только первого.
+    code = _make_booking("Петров", "Сидоров")
+    response = client.get(
+        f"/api/bookings/{code}", params={"lastName": "Сидоров"}
+    )
+
+    assert response.status_code == 200
+    assert response.json()["code"] == code
+
+
 def test_get_booking_last_name_case_and_spaces_insensitive():
     code = _make_booking("Петров")
-    response = client.get(f"/api/bookings/{code}", params={"lastName": "  пЕтРоВ  "})
+    response = client.get(
+        f"/api/bookings/{code}", params={"lastName": "  пЕтРоВ  "}
+    )
 
     assert response.status_code == 200
     assert response.json()["code"] == code
@@ -249,14 +300,18 @@ def test_get_booking_code_is_case_insensitive():
 
 def test_get_booking_wrong_last_name_returns_404():
     code = _make_booking("Петров")
-    response = client.get(f"/api/bookings/{code}", params={"lastName": "Иванов"})
+    response = client.get(
+        f"/api/bookings/{code}", params={"lastName": "Иванов"}
+    )
 
     assert response.status_code == 404
     assert response.json()["code"] == "not_found"
 
 
 def test_get_booking_unknown_code_returns_404():
-    response = client.get("/api/bookings/ZZZZZZ", params={"lastName": "Петров"})
+    response = client.get(
+        "/api/bookings/ZZZZZZ", params={"lastName": "Петров"}
+    )
 
     assert response.status_code == 404
     assert response.json()["code"] == "not_found"
@@ -279,15 +334,20 @@ def test_cancel_booking_returns_cancelled():
     assert response.status_code == 200
     assert response.json()["status"] == "cancelled"
     # статус сохранился в базе
-    assert client.get(
+    persisted = client.get(
         f"/api/bookings/{code}", params={"lastName": "Петров"}
-    ).json()["status"] == "cancelled"
+    ).json()
+    assert persisted["status"] == "cancelled"
 
 
 def test_cancel_booking_is_idempotent():
     code = _make_booking("Петров")
-    first = client.post(f"/api/bookings/{code}/cancel", json={"lastName": "Петров"})
-    second = client.post(f"/api/bookings/{code}/cancel", json={"lastName": "Петров"})
+    first = client.post(
+        f"/api/bookings/{code}/cancel", json={"lastName": "Петров"}
+    )
+    second = client.post(
+        f"/api/bookings/{code}/cancel", json={"lastName": "Петров"}
+    )
 
     assert first.status_code == 200
     assert second.status_code == 200
@@ -315,7 +375,9 @@ def test_cancel_booking_wrong_last_name_returns_404():
 def test_cancel_booking_non_string_last_name_returns_404():
     # {"lastName": 1} не должен падать 500 — ожидаем обычный 404.
     code = _make_booking("Петров")
-    response = client.post(f"/api/bookings/{code}/cancel", json={"lastName": 1})
+    response = client.post(
+        f"/api/bookings/{code}/cancel", json={"lastName": 1}
+    )
 
     assert response.status_code == 404
     assert response.json()["code"] == "not_found"
@@ -325,8 +387,9 @@ def test_head_on_api_returns_json_404_not_index_html():
     for path in ("/api/cities", "/api/does-not-exist"):
         response = client.head(path)
         assert response.status_code == 404, path
-        assert "application/json" in response.headers["content-type"], path
-        assert "text/html" not in response.headers["content-type"], path
+        content_type = response.headers["content-type"]
+        assert "application/json" in content_type, path
+        assert "text/html" not in content_type, path
 
 
 def test_path_traversal_does_not_leak_files():
@@ -334,5 +397,5 @@ def test_path_traversal_does_not_leak_files():
     response = client.get("/%2e%2e%2f%2e%2e%2fpyproject.toml")
 
     assert response.status_code == 200
-    assert "hexlet-code" not in response.text  # содержимое pyproject не утекло
+    assert "hexlet-code" not in response.text  # содержимое не утекло
     assert "<!doctype html" in response.text.lower()
