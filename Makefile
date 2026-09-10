@@ -28,7 +28,10 @@ test:
 test-api:
 	uv run pytest
 
+lint:
+	uv run ruff check
+
 contract:
 	npx tsp compile contract
 
-.PHONY: install build start migrate seed test test-api contract
+.PHONY: install build start migrate seed test test-api lint contract
