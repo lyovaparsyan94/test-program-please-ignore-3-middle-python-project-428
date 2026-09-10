@@ -3,10 +3,10 @@
 [![hexlet-check](https://github.com/lyovaparsyan94/test-program-please-ignore-3-middle-python-project-428/actions/workflows/hexlet-check.yml/badge.svg)](https://github.com/lyovaparsyan94/test-program-please-ignore-3-middle-python-project-428/actions)
 [![main](https://github.com/lyovaparsyan94/test-program-please-ignore-3-middle-python-project-428/actions/workflows/main.yml/badge.svg)](https://github.com/lyovaparsyan94/test-program-please-ignore-3-middle-python-project-428/actions/workflows/main.yml)
 
-Реализуйте бекенд сервиса бронирования авиабилетов: справочник городов, поиск рейсов,
-оформление, просмотр и отмену брони. Фреймворк выбираете сами, данные храните в PostgreSQL.
-Фронтенд предоставляет Хекслет — готовое приложение, которое подключается к вашему API
-и работает только тогда, когда API отвечает по описанному контракту.
+Бэкенд сервиса бронирования авиабилетов: справочник городов, поиск рейсов,
+оформление, просмотр и отмена брони. Данные хранятся в PostgreSQL. Фронтенд —
+готовое приложение от Хекслета, которое подключается к API и работает по описанному
+контракту (реализованы все шесть эндпоинтов под `/api`).
 
 Учебный проект Хекслета: https://ru.hexlet.io/programs/test-program-please-ignore-3-middle-python
 Как это должно работать: https://files.hexlet.app/a/76p1kx

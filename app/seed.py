@@ -42,7 +42,10 @@ def _build_flights(today):
                 continue
             for day in range(DAYS_AHEAD):
                 flight_date = today + timedelta(days=day)
-                count = 2 + _seed(origin, destination, day, "count") % 2
+                # Ключ — абсолютная дата, как и у остальных атрибутов ниже:
+                # иначе одна и та же дата на разных запусках дала бы разное
+                # число рейсов, и предсказуемость из докстринга не держалась бы.
+                count = 2 + _seed(origin, destination, flight_date.isoformat(), "count") % 2
                 for idx in range(count):
                     h = _seed(origin, destination, flight_date.isoformat(), idx)
                     airline = airline_codes[h % len(airline_codes)]
@@ -92,8 +95,9 @@ def seed() -> None:
                 """,
                 AIRLINES,
             )
-            # Рейсы — DO NOTHING: не затираем seats_available, уменьшенный
-            # бронями, и не плодим дубли при повторной заливке.
+            # Рейсы — DO NOTHING: детерминированный id уже задаёт все атрибуты,
+            # так что повторная заливка не плодит дубли и не трогает существующие
+            # строки (id — первичный ключ, конфликт просто пропускается).
             cur.executemany(
                 """
                 INSERT INTO flights (

@@ -9,5 +9,8 @@ node_modules/
 # Build output (frontend static)
 public/
 
+# Артефакты браузерных тестов: отчёт, трассировки, запись экрана
+tmp/
+
 # Env
 .env

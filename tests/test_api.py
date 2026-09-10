@@ -303,3 +303,29 @@ def test_cancel_booking_wrong_last_name_returns_404():
 
     assert response.status_code == 404
     assert response.json()["code"] == "not_found"
+
+
+def test_cancel_booking_non_string_last_name_returns_404():
+    # {"lastName": 1} не должен падать 500 — ожидаем обычный 404.
+    code = _make_booking("Петров")
+    response = client.post(f"/api/bookings/{code}/cancel", json={"lastName": 1})
+
+    assert response.status_code == 404
+    assert response.json()["code"] == "not_found"
+
+
+def test_head_on_api_returns_json_404_not_index_html():
+    for path in ("/api/cities", "/api/does-not-exist"):
+        response = client.head(path)
+        assert response.status_code == 404, path
+        assert "application/json" in response.headers["content-type"], path
+        assert "text/html" not in response.headers["content-type"], path
+
+
+def test_path_traversal_does_not_leak_files():
+    # `..` в пути не должен выдавать файлы за пределами public/.
+    response = client.get("/%2e%2e%2f%2e%2e%2fpyproject.toml")
+
+    assert response.status_code == 200
+    assert "hexlet-code" not in response.text  # содержимое pyproject не утекло
+    assert "<!doctype html" in response.text.lower()

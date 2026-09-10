@@ -5,6 +5,7 @@ on: [push, pull_request]
 jobs:
   tests:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     services:
       db:
         image: postgres:17
@@ -43,7 +44,9 @@ jobs:
           if [ -d "__tests__" ]; then
             npx playwright install --with-deps chromium
             make start &
-            until curl -sf "$APP_URL/api/cities" >/dev/null; do sleep 1; done
+            # --retry с таймаутом вместо бесконечного цикла: если make start
+            # в фоне упал, шаг завершится, а не будет крутиться до лимита раннера.
+            curl -sf --retry 30 --retry-connrefused --retry-delay 1 "$APP_URL/api/cities" >/dev/null
             make test
           else
             echo "Каталог __tests__ отсутствует — браузерные тесты пропущены."
